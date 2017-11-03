@@ -1,0 +1,6 @@
+[package]
+name = "xmkit"
+version = "0.1.0"
+authors = ["utz82 <utz82@users.noreply.github.com>"]
+
+[dependencies]
