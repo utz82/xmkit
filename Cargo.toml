@@ -1,6 +1,8 @@
 [package]
 name = "xmkit"
+description = "A simple library for retrieving information from eXtended Module (XM) files"
 version = "0.1.0"
 authors = ["utz82 <utz82@users.noreply.github.com>"]
+license = "MIT"
 
 [dependencies]
