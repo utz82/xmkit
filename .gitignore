@@ -1,4 +1,7 @@
 target
 Cargo.lock
 *.xm
+*.xp
+*.xt
+*.xi
 /.vscode
