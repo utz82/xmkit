@@ -22,6 +22,9 @@ pub mod xmkit {
     const XM_DEFAULT_TEMPO: usize = 0x4c;
     const XM_DEFAULT_BPM: usize = 0x4e;    
     const XM_SEQUENCE_BEGIN: usize = 0x50;
+    const XM_EFFECTS: [u8; 38] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 0xa, 0xb, 0xc, 0xd, 0xf, 0x10, 0x11, 
+        0x14, 0x15, 0x19, 0x1b, 0x1d, 0x22, 0x23, 0xe1, 0xe2, 0xe3, 0xe4, 0xe5, 0xe6, 0xe7, 0xe8, 0xe9, 0xea, 0xeb, 0xec, 0xed, 0xee];
+    const XM_EFFECTS_WITH_MEMORY: [u8; 19] = [1, 2, 3, 4, 5, 6, 7, 9, 0xa, 0x11, 0x19, 0x1b, 0x1d, 0x22, 0x23, 0xe1, 0xe2, 0xea, 0xeb];
     pub const XM_ENVELOPE_ON: u8 = 0x1;
     pub const XM_ENVELOPE_SUSTAIN: u8 = 0x2;
     pub const XM_ENVELOPE_LOOP: u8 = 0x4;
@@ -29,6 +32,45 @@ pub mod xmkit {
     pub const XM_SAMPLE_LOOP_FORWARD: u8 = 0x2;
     pub const XM_SAMPLE_LOOP_PINGPONG: u8 = 0x4;
     pub const XM_SAMPLE_16BIT: u8 = 0x10;
+    pub const XM_FX_0XX: u8 = 0;
+    pub const XM_FX_1XX: u8 = 1;
+    pub const XM_FX_2XX: u8 = 2;
+    pub const XM_FX_3XX: u8 = 3;
+    pub const XM_FX_4XX: u8 = 4;
+    pub const XM_FX_5XX: u8 = 5;
+    pub const XM_FX_6XX: u8 = 6;
+    pub const XM_FX_7XX: u8 = 7;
+    pub const XM_FX_8XX: u8 = 8;
+    pub const XM_FX_9XX: u8 = 9;
+    pub const XM_FX_AXX: u8 = 0xa;
+    pub const XM_FX_BXX: u8 = 0xb;
+    pub const XM_FX_CXX: u8 = 0xc;
+    pub const XM_FX_DXX: u8 = 0xd;
+    pub const XM_FX_E1X: u8 = 0xe1;
+    pub const XM_FX_E2X: u8 = 0xe2;
+    pub const XM_FX_E3X: u8 = 0xe3;
+    pub const XM_FX_E4X: u8 = 0xe4;
+    pub const XM_FX_E5X: u8 = 0xe5;
+    pub const XM_FX_E6X: u8 = 0xe6;
+    pub const XM_FX_E7X: u8 = 0xe7;
+    pub const XM_FX_E8X: u8 = 0xe8;
+    pub const XM_FX_E9X: u8 = 0xe9;
+    pub const XM_FX_EAX: u8 = 0xea;
+    pub const XM_FX_EBX: u8 = 0xeb;
+    pub const XM_FX_ECX: u8 = 0xec;
+    pub const XM_FX_EDX: u8 = 0xed;
+    pub const XM_FX_EEX: u8 = 0xee;
+    pub const XM_FX_FXX: u8 = 0xf;
+    pub const XM_FX_GXX: u8 = 0x10;
+    pub const XM_FX_HXX: u8 = 0x11;
+    pub const XM_FX_KXX: u8 = 0x14;
+    pub const XM_FX_LXX: u8 = 0x15;
+    pub const XM_FX_PXX: u8 = 0x19;
+    pub const XM_FX_RXX: u8 = 0x1b;
+    pub const XM_FX_TXX: u8 = 0x1d;
+    pub const XM_FX_X1X: u8 = 0x22;
+    pub const XM_FX_X2X: u8 = 0x23;
+
 
 
     #[derive(Default)]
@@ -225,12 +267,7 @@ pub mod xmkit {
     #[derive(Default)]
     pub struct XMPattern {
         header: Vec<u8>,
-        channel_count: u8,
-        notes: Vec<Vec<Option<u8>>>,
-        instruments: Vec<Vec<Option<u8>>>,
-        volumes: Vec<Vec<Option<u8>>>,
-        fx_commands: Vec<Vec<Option<u8>>>,
-        fx_params: Vec<Vec<Option<u8>>>,
+        pub tracks: Vec<XMTrack>,
     }
 
     impl XMPattern {
@@ -243,24 +280,15 @@ pub mod xmkit {
             }
 
             let mut ptn: XMPattern = Default::default();
-            ptn.channel_count = channel_count;
-            ptn.header = data[0..XModule::read_usize(&data, 0)].to_vec();
-
-            let mut file_offset = 0;
+            let mut file_offset = XModule::read_usize(&data, 0);
             let ptn_len = data[5];
-            file_offset += XModule::read_usize(&data, file_offset);
+            let channel_count = channel_count as usize;
+
+            ptn.header = data[0..file_offset].to_vec();
+            ptn.tracks = Vec::with_capacity(channel_count);
 
             for _ in 0..channel_count {
-                let v: Vec<Option<u8>> = Vec::with_capacity(ptn_len as usize);
-                ptn.notes.push(v);
-                let v: Vec<Option<u8>> = Vec::with_capacity(ptn_len as usize);
-                ptn.instruments.push(v);
-                let v: Vec<Option<u8>> = Vec::with_capacity(ptn_len as usize);
-                ptn.volumes.push(v);
-                let v: Vec<Option<u8>> = Vec::with_capacity(ptn_len as usize);
-                ptn.fx_commands.push(v);
-                let v: Vec<Option<u8>> = Vec::with_capacity(ptn_len as usize);
-                ptn.fx_params.push(v);
+                ptn.tracks.push(Default::default())
             }
 
             for _ in 0..ptn_len {
@@ -270,53 +298,64 @@ pub mod xmkit {
                     if ctrl & 0x80 != 0 {
                         file_offset += 1;
                         if ctrl & 1 != 0 {
-                            ptn.notes[chan as usize].push(Some(data[file_offset]));
+                            ptn.tracks[chan].notes.push(Some(data[file_offset]));
                             file_offset += 1;
                         }
                         else {
-                            ptn.notes[chan as usize].push(None);
+                            ptn.tracks[chan].notes.push(None);
                         }
                         if ctrl & 2 != 0 {
-                            ptn.instruments[chan as usize].push(Some(data[file_offset]));
+                            ptn.tracks[chan].instruments.push(Some(data[file_offset]));
                             file_offset += 1;
                         }
                         else {
-                            ptn.instruments[chan as usize].push(None);
+                            ptn.tracks[chan].instruments.push(None);
                         }
                         if ctrl & 4 != 0 {
-                            ptn.volumes[chan as usize].push(Some(data[file_offset]));
+                            ptn.tracks[chan].volumes.push(Some(data[file_offset]));
                             file_offset += 1;
                         }
                         else {
-                            ptn.volumes[chan as usize].push(None);
+                            ptn.tracks[chan].volumes.push(None);
                         }
                         if ctrl & 8 != 0 {
-                            ptn.fx_commands[chan as usize].push(Some(data[file_offset]));
+                            ptn.tracks[chan].fx_commands.push(Some(data[file_offset]));
                             file_offset += 1;
                         }
                         else {
-                            ptn.fx_commands[chan as usize].push(None);
+                            ptn.tracks[chan].fx_commands.push(None);
                         }
                         if ctrl & 0x10 != 0 {
-                            ptn.fx_params[chan as usize].push(Some(data[file_offset]));
+                            ptn.tracks[chan].fx_params.push(Some(data[file_offset]));
                             file_offset += 1;
                         }
                         else {
-                            ptn.fx_params[chan as usize].push(None);
+                            ptn.tracks[chan].fx_params.push(None);
                         }
                     }
                     else {
-                        ptn.notes[chan as usize].push(Some(data[file_offset]));
-                        ptn.instruments[chan as usize].push(Some(data[file_offset + 1]));
-                        ptn.volumes[chan as usize].push(Some(data[file_offset + 2]));
-                        ptn.fx_commands[chan as usize].push(Some(data[file_offset + 3]));
-                        ptn.fx_params[chan as usize].push(Some(data[file_offset + 4]));
+                        ptn.tracks[chan].notes.push(Some(data[file_offset]));
+                        ptn.tracks[chan].instruments.push(Some(data[file_offset + 1]));
+                        ptn.tracks[chan].volumes.push(Some(data[file_offset + 2]));
+                        ptn.tracks[chan].fx_commands.push(Some(data[file_offset + 3]));
+                        ptn.tracks[chan].fx_params.push(Some(data[file_offset + 4]));
                         file_offset += 5;
                     }
                 } 
             }
 
             Ok(ptn)
+        }
+
+        /// Returns the number of channels in the pattern.
+        /// If the XMPattern is part of an XModule, the result will be the same as calling channel_count() on the XModule.
+        pub fn channel_count(&self) -> u8 {
+            self.tracks.len() as u8
+        }
+
+        /// Returns the number of rows in the pattern. This value can be at most 256.
+        pub fn len(&self) -> u16 {
+            XModule::read_u16(&self.header, 5)
         }
     }
 
@@ -328,6 +367,240 @@ pub mod xmkit {
         volumes: Vec<Option<u8>>,
         fx_commands: Vec<Option<u8>>,
         fx_params: Vec<Option<u8>>,
+    }
+
+    impl XMTrack {
+        /// Returns the currently effective parameter for the given effect command.
+        /// Use XM_FX_* constants to pass the fx_command value. Extended effect (E1x..EEx, X1, X2) are considered seperate effects.
+        /// To retrieve the effect command or parameter active on a given row instead, call fx_command()/fx_param().
+        /// To retrieve the raw effect command and parameter bytes, call fx_command_raw() and fx_param_raw() instead.
+        /// To retrieve only volume effect commands, call volume_fx().
+        ///
+        /// # Errors
+        /// Returns an XMParseError if the given row is greater than the length of the pattern, or if the given fx_command parameter is invalid.
+        pub fn fx(&self, fx_command: u8, row: u8) -> Result<u8, XMParseError> {
+            self.validate_row(&row)?;
+            let row = row as usize;
+            
+            let mut valid_fx: bool = false;
+            for fx in XM_EFFECTS.iter() {
+                if *fx == fx_command {
+                    valid_fx = true;
+                    break;
+                }
+            }
+            if !valid_fx {
+                return Err(XMParseError::new(&format!("Invalid fx command {} requested.", fx_command)));
+            }
+
+            let mut fx_mem: bool = false;
+            for fx in XM_EFFECTS_WITH_MEMORY.iter() {
+                if *fx == fx_command {
+                    fx_mem = true;
+                    break;
+                }
+            }
+
+            let mut param_default: u8 = 0;
+            if fx_command == XM_FX_E5X { param_default = 8; }
+            let mut param: u8 = 0;
+
+            if fx_command <= XM_FX_TXX {
+                for r in 0..row + 1 {
+                    match self.notes[r] {
+                        Some(_) => param = param_default,
+                        None => (), 
+                    };
+                    match self.fx_commands[r] {
+                        Some(cmd) => {
+                            if cmd == fx_command {
+                                match self.fx_params[r] {
+                                    Some(p) => if p > 0 || !fx_mem { param = p; },
+                                    None => (),
+                                }
+                            }
+                            else if !fx_mem {
+                                param = param_default;
+                            }
+                        },
+                        None => if !fx_mem { param = param_default; },
+                    }
+                }
+            }
+            // have extended fx
+            else {
+                let mut cmd_hi = 0xe;
+                let mut cmd_lo = fx_command & 0xf;
+                if fx_command <= XM_FX_X2X {
+                    cmd_hi = 0x21;
+                    cmd_lo = (fx_command - 0x21) << 4;
+                }
+                for r in 0..row + 1 {
+                    match self.notes[r] {
+                        Some(_) => param = param_default,
+                        None => (),
+                    };
+                    match self.fx_commands[r] {
+                        Some(cmd) => {
+                            if cmd == cmd_hi {
+                                match self.fx_params[r] {
+                                    Some(p) => {
+                                        if p & 0xf0 == cmd_lo {
+                                            if p > 0 || !fx_mem { param = p & 0xf; }
+                                            else { param = param_default; }
+                                        }
+                                    },
+                                    None => (),
+                                }
+                            }
+                        },
+                        None => if !fx_mem { param = param_default; },
+                    }
+                }
+            }
+
+            Ok(param)
+        }
+
+        /// Returns the raw effect command data byte of the given row.
+        /// To retrieve the effect command active on a given row instead, call fx_command().
+        ///
+        /// # Errors
+        /// Returns an XMParseError if the given row is greater than the length of the pattern.
+        pub fn fx_command_raw(&self, row: u8) -> Result<Option<u8>, XMParseError> {
+            self.validate_row(&row)?;
+            Ok(self.fx_commands[row as usize])
+        }
+
+        /// Returns the raw effect parameter data byte of the given row.
+        /// To retrieve the effect parameter active on a given row instead, call fx_command().
+        /// To retrieve the state of a given effect on a given row, call fx().
+        ///
+        /// # Errors
+        /// Returns an XMParseError if the given row is greater than the length of the pattern.
+        pub fn fx_param_raw(&self, row: u8) -> Result<Option<u8>, XMParseError> {
+            self.validate_row(&row)?;
+            Ok(self.fx_params[row as usize])
+        }
+
+        /// Returns the instrument active on the given row. To retrieve the actual instrument data, use instrument_raw().
+        /// If there is no note trigger on the given row, it will return the last used instrument.
+        /// If no note was triggered in the pattern up to and including the given row, it will return 0.
+        ///
+        /// # Errors
+        /// Returns an XMParseError if the given row is greater than the length of the pattern.
+        pub fn instrument(&self, row: u8) -> Result<u8, XMParseError> {
+            self.validate_row(&row)?;
+
+            for _ in (0..row + 1).rev() {
+                match self.instruments[row as usize] {
+                    Some(instr) => return Ok(instr),
+                    None => (),
+                };
+            }
+
+            Ok(0)
+        }
+
+        /// Returns the raw instrument data byte of the given row.
+        /// To retrieve the instrument active on a given row instead, call instrument().
+        ///
+        /// # Errors
+        /// Returns an XMParseError if the given row is greater than the length of the pattern.
+        pub fn instrument_raw(&self, row: u8) -> Result<Option<u8>, XMParseError> {
+            self.validate_row(&row)?;
+            Ok(self.instruments[row as usize])
+        }
+
+        /// Returns the note active on the given row. To retrieve the actual note data, use note_raw().
+        /// If there is no note trigger on the given row, it will return the last used note.
+        /// If no note was triggered in the pattern up to and including the given row, it will return 0.
+        ///
+        /// # Errors
+        /// Returns an XMParseError if the given row is greater than the length of the pattern.
+        // TODO need to check for fx command K (key_off)
+        pub fn note(&self, row: u8) -> Result<u8, XMParseError> {
+            self.validate_row(&row)?;
+
+            for _ in (0..row + 1).rev() {
+                match self.notes[row as usize] {
+                    Some(note) => return Ok(note),
+                    None => (),
+                };
+            }
+
+            Ok(0)
+        }
+
+        /// Returns the raw note data byte of the given row. 
+        /// To retrieve the note active on a given row instead, call note().
+        ///
+        /// # Errors
+        /// Returns an XMParseError if the given row is greater than the length of the pattern.
+        pub fn note_raw(&self, row: u8) -> Result<Option<u8>, XMParseError> {
+            self.validate_row(&row)?;
+            Ok(self.notes[row as usize])
+        }
+
+        /// Returns true if a note is triggered on the given row, false otherwise.
+        ///
+        /// # Errors
+        /// Returns an XMParseError if the given row is greater than the length of the pattern.
+        pub fn trigger(&self, row: u8) -> Result<bool, XMParseError> {
+            self.validate_row(&row)?;
+
+            match self.notes[row as usize] {
+                Some(_) => Ok(true),
+                None => Ok(false),
+            }
+        }
+
+        /// Returns the active volume setting on the current row.
+        /// It will only return the actual volume setting, adjusted to a range of 0..0x40.
+        /// Volume column effects can be retrieved by calling volume_fx() or fx().
+        /// The actual volume column byte can be retrieved by calling volume_raw().
+        ///
+        /// # Errors
+        /// Returns an XMParseError if the given row is greater than the length of the pattern.
+        pub fn volume(&self, row: u8) -> Result<u8, XMParseError> {
+            self.validate_row(&row)?;
+
+            for _ in (0..row + 1).rev() {
+                
+                match self.volumes[row as usize] {
+                    Some(vol) => if vol >= 0x10 && vol <= 0x50 { return Ok(vol); },
+                    None => (),
+                };
+
+                match self.notes[row as usize] {
+                    Some(_) => break,
+                    None => (),
+                };
+            }
+
+            Ok(0x40)
+        }
+
+        /// Returns the raw volume data byte of the given row. 
+        /// To retrieve the volume setting that applies on a given row, call note() instead.
+        /// To retrieve volume effect settings, call volume_fx().
+        ///
+        /// # Errors
+        /// Returns an XMParseError if the given row is greater than the length of the pattern.
+        pub fn volume_raw(&self, row: u8) -> Result<Option<u8>, XMParseError> {
+            self.validate_row(&row)?;
+            Ok(self.volumes[row as usize])
+        }
+
+        fn validate_row(&self, _row: &u8) -> Result<bool, XMParseError> {
+            let row = *_row as usize;
+
+            if row >= self.notes.len() { 
+                return Err(XMParseError::new(&format!("Row {} does not exist in pattern, pattern length = {} rows.", row, self.notes.len())));
+            }
+
+            Ok(true)
+        }
     }
 
 
@@ -535,21 +808,63 @@ pub mod xmkit {
             else { true }
         }
 
-        // pub fn data_8bit_signed(&self) -> Vec<i8> {
+        /// Returns the sample data as signed 8-bit PCM.
+        pub fn data_8bit_signed(&self) -> Vec<i8> {
+            let data_i16 = self.data_16bit_signed();
+            let mut data_i8: Vec<i8> = Vec::with_capacity(data_i16.len());
+            
+            for smp in data_i16 {
+                data_i8.push((smp >> 8) as i8);
+            }
+            
+            data_i8
+        }
 
-        // }
+        /// Returns the sample data as unsigned 8-bit PCM.
+        pub fn data_8bit_unsigned(&self) -> Vec<u8> {
+            let data_i16 = self.data_16bit_signed();
+            let mut data_u8: Vec<u8> = Vec::with_capacity(data_i16.len());
+            
+            for smp in data_i16 {
+                data_u8.push(((smp + 0x7fff + 1) >> 8) as u8);
+            }
+            
+            data_u8
+        }
 
-        // pub fn data_8bit_unsigned(&self) -> Vec<u8> {
+        /// Returns the sample data as signed 16-bit PCM.
+        pub fn data_16bit_signed(&self) -> Vec<i16> {
+            let step = if self.is_16bit() { 2 } else { 1 };
+            let mut data_i16: Vec<i16> = Vec::with_capacity(self.len() / step);
+            let mut pos = 0;
+            let mut smpval = 0;
 
-        // }
+            while pos + step <= self.len() {
+                if self.is_16bit() {
+                    smpval += XModule::read_u16(&self.data, pos) as i16;
+                }
+                else {
+                    smpval += (self.data[pos] as i16) << 8;
+                }
+                data_i16.push(smpval);
+                pos += step;
+            }
 
-        // pub fn data_16bit_signed(&self) -> Vec<i16> {
+            data_i16
+        }
 
-        // }
+        /// Returns the sample data as unsigned 16-bit PCM.
+        pub fn data_16bit_unsigned(&self) -> Vec<u16> {
+            let data_i16 = self.data_16bit_signed();
+            let mut data_u16: Vec<u16> = Vec::with_capacity(data_i16.len());
+            
+            for smp in data_i16 {
+                    // work-around to prevent the compiler from flagging 0x8000 literal being out of range
+                    data_u16.push((smp + 0x7fff + 1) as u16);
+            }
 
-        // pub fn data_16bit_unsigned(&self) -> Vec<u16> {
-
-        // }
+            data_u16
+        }
 
         /// Returns the sample data in XM's native delta format.
         /// Use is_16bit() to check the data resolution.
