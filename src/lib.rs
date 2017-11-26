@@ -1,3 +1,5 @@
+pub use xmkit::*;
+
 /// A module for extracting information from eXtended Module (XM) files.
 pub mod xmkit {
     use std::error::Error;
@@ -6,7 +8,6 @@ pub mod xmkit {
     use std::io::prelude::*;
     use std::path::Path;
     use std::str;
-
 
     const XM_MODULE_NAME: usize = 0x11;
     const XM_TRACKER_NAME: usize = 0x25;
@@ -347,6 +348,37 @@ pub mod xmkit {
             Ok(ptn)
         }
 
+        /// Returns the effective BPM setting on the given row.
+        /// This function requires a reference to an XModule object, since it is not always possible to determine
+        /// the correct value without this context.
+        ///
+        /// # Errors
+        /// Returns an XMParseError if the given row does not exist in the pattern.
+        pub fn bpm(&self, xm: &XModule, row: u8) -> Result<u8, XMParseError> {
+
+            let mut bpm = xm.bpm();
+            let mut row_val_detect = 0;
+            for trk in &self.tracks {
+                for row_nr in row_val_detect..row + 1 {
+                    match trk.fx_command_raw(row_nr)? {
+                        Some(cmd) => {
+                            if cmd == 0xf {
+                                match trk.fx_param_raw(row_nr)? {
+                                    Some(param) => if param >= 0x20 {
+                                        bpm = param;
+                                        row_val_detect = row_nr;
+                                    },
+                                    None => (),
+                                };
+                            }
+                        },
+                        None => (),
+                    }
+                }
+            }
+            Ok(bpm)
+        }        
+
         /// Returns the number of channels in the pattern.
         /// If the XMPattern is part of an XModule, the result will be the same as calling channel_count() on the XModule.
         pub fn channel_count(&self) -> u8 {
@@ -356,6 +388,37 @@ pub mod xmkit {
         /// Returns the number of rows in the pattern. This value can be at most 256.
         pub fn len(&self) -> u16 {
             XModule::read_u16(&self.header, 5)
+        }
+
+        /// Returns the effective tempo setting on the given row.
+        /// This function requires a reference to an XModule object, since it is not always possible to determine
+        /// the correct value without this context.
+        ///
+        /// # Errors
+        /// Returns an XMParseError if the given row does not exist in the pattern.
+        pub fn tempo(&self, xm: &XModule, row: u8) -> Result<u8, XMParseError> {
+
+            let mut tempo = xm.tempo();
+            let mut row_val_detect = 0;
+            for trk in &self.tracks {
+                for row_nr in row_val_detect..row + 1 {
+                    match trk.fx_command_raw(row_nr)? {
+                        Some(cmd) => {
+                            if cmd == 0xf {
+                                match trk.fx_param_raw(row_nr)? {
+                                    Some(param) => if param < 0x20 {
+                                        tempo = param;
+                                        row_val_detect = row_nr;
+                                    },
+                                    None => (),
+                                };
+                            }
+                        },
+                        None => (),
+                    }
+                }
+            }
+            Ok(tempo)
         }
     }
 
@@ -492,8 +555,8 @@ pub mod xmkit {
         pub fn instrument(&self, row: u8) -> Result<u8, XMParseError> {
             self.validate_row(&row)?;
 
-            for _ in (0..row + 1).rev() {
-                match self.instruments[row as usize] {
+            for current_row in (0..row + 1).rev() {
+                match self.instruments[current_row as usize] {
                     Some(instr) => return Ok(instr),
                     None => (),
                 };
@@ -522,8 +585,8 @@ pub mod xmkit {
         pub fn note(&self, row: u8) -> Result<u8, XMParseError> {
             self.validate_row(&row)?;
 
-            for _ in (0..row + 1).rev() {
-                match self.notes[row as usize] {
+            for current_row in (0..row + 1).rev() {
+                match self.notes[current_row as usize] {
                     Some(note) => return Ok(note),
                     None => (),
                 };
@@ -536,16 +599,27 @@ pub mod xmkit {
         /// To retrieve the note active on a given row instead, call note().
         ///
         /// # Errors
-        /// Returns an XMParseError if the given row is greater than the length of the pattern.
+        /// Returns an XMParseError if the given row is greater than the length of the track.
         pub fn note_raw(&self, row: u8) -> Result<Option<u8>, XMParseError> {
             self.validate_row(&row)?;
             Ok(self.notes[row as usize])
         }
 
+        /// Returns true if the given row contains a note trigger.
+        ///
+        /// # Errors
+        /// Returns an XMParseError if the given row is greater than the length of the track.
+        pub fn note_trigger(&self, row: u8) -> Result<bool, XMParseError> {
+            match self.note_raw(row)? {
+                Some(_) => Ok(true),
+                None => Ok(false),
+            }
+        }
+
         /// Returns true if a note is triggered on the given row, false otherwise.
         ///
         /// # Errors
-        /// Returns an XMParseError if the given row is greater than the length of the pattern.
+        /// Returns an XMParseError if the given row is greater than the length of the track.
         pub fn trigger(&self, row: u8) -> Result<bool, XMParseError> {
             self.validate_row(&row)?;
 
@@ -561,18 +635,18 @@ pub mod xmkit {
         /// The actual volume column byte can be retrieved by calling volume_raw().
         ///
         /// # Errors
-        /// Returns an XMParseError if the given row is greater than the length of the pattern.
+        /// Returns an XMParseError if the given row is greater than the length of the track.
         pub fn volume(&self, row: u8) -> Result<u8, XMParseError> {
             self.validate_row(&row)?;
 
-            for _ in (0..row + 1).rev() {
+            for current_row in (0..row + 1).rev() {
                 
-                match self.volumes[row as usize] {
-                    Some(vol) => if vol >= 0x10 && vol <= 0x50 { return Ok(vol); },
+                match self.volumes[current_row as usize] {
+                    Some(vol) => if vol >= 0x10 && vol <= 0x50 { return Ok(vol - 0x10); },
                     None => (),
                 };
 
-                match self.notes[row as usize] {
+                match self.notes[current_row as usize] {
                     Some(_) => break,
                     None => (),
                 };
@@ -586,7 +660,7 @@ pub mod xmkit {
         /// To retrieve volume effect settings, call volume_fx().
         ///
         /// # Errors
-        /// Returns an XMParseError if the given row is greater than the length of the pattern.
+        /// Returns an XMParseError if the given row is greater than the length of the track.
         pub fn volume_raw(&self, row: u8) -> Result<Option<u8>, XMParseError> {
             self.validate_row(&row)?;
             Ok(self.volumes[row as usize])
