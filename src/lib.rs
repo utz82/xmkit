@@ -695,12 +695,12 @@ pub mod xmkit {
                 instr.header = data[..XModule::read_usize(&data, 0)].to_vec();
                 let mut instr_samples = Vec::with_capacity(sample_count);
                 let mut header_offset: usize = instr.header.len();
-                let mut data_offset: usize = sample_count * 40;
+                let mut data_offset: usize = header_offset + sample_count * 40;
                 
                 for _ in 0..sample_count {
                     instr_samples.push(XMSample{
                         header: data[header_offset..(header_offset+40)].to_vec(),
-                        data: data[data_offset..XModule::read_usize(&data, header_offset)].to_vec(),
+                        data: data[data_offset..data_offset + XModule::read_usize(&data, header_offset)].to_vec(),
                     });
 
                     header_offset += 40;
@@ -900,7 +900,7 @@ pub mod xmkit {
             let mut data_u8: Vec<u8> = Vec::with_capacity(data_i16.len());
             
             for smp in data_i16 {
-                data_u8.push(((smp + 0x7fff + 1) >> 8) as u8);
+                data_u8.push((((smp as u16 >> 8) + 0x80) & 0xff) as u8);
             }
             
             data_u8
@@ -911,14 +911,14 @@ pub mod xmkit {
             let step = if self.is_16bit() { 2 } else { 1 };
             let mut data_i16: Vec<i16> = Vec::with_capacity(self.len() / step);
             let mut pos = 0;
-            let mut smpval = 0;
+            let mut smpval: i16 = 0;
 
             while pos + step <= self.len() {
                 if self.is_16bit() {
-                    smpval += XModule::read_u16(&self.data, pos) as i16;
+                    smpval = smpval.wrapping_add(XModule::read_u16(&self.data, pos) as i16);
                 }
                 else {
-                    smpval += (self.data[pos] as i16) << 8;
+                    smpval = smpval.wrapping_add((XModule::read_u16(&self.data, pos) as i16) << 8);
                 }
                 data_i16.push(smpval);
                 pos += step;
@@ -934,7 +934,7 @@ pub mod xmkit {
             
             for smp in data_i16 {
                     // work-around to prevent the compiler from flagging 0x8000 literal being out of range
-                    data_u16.push((smp + 0x7fff + 1) as u16);
+                    data_u16.push(smp.wrapping_add(0x7fffi16.wrapping_add(1)) as u16);
             }
 
             data_u16
